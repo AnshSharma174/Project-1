@@ -1,0 +1,27 @@
+Basic CSS syntax
+
+
+selector{ 
+    property: value;
+}
+
+1)selector - selects the elements(tag + content)
+2)property - what you want to change (width, height, etc)
+3)value - sets the provided value to the selected property.
+
+-> Three ways  to apply CSS
+1. Inline CSS - inside the HTML tag.
+2. Internal CSS - inside <style> in <head> .
+  3. External CSS - seperates .CSS file.
+
+
+
+
+
+  --> Three ways to write colors
+  1)RgB;
+ 2) HEX;
+ 3) HSL;
+
+
+  
