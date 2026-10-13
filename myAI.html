@@ -1,0 +1,390 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MyGPT - Smart Search</title>
+
+<style>
+:root {
+  --bg:#101116; --panel:#191b23; --card:#20232d;
+  --text:#f5f5f7; --muted:#a0a4b3; --accent:#66e0bd;
+}
+.light {
+  --bg:#f4f6fa; --panel:#fff; --card:#e9edf5;
+  --text:#202432; --muted:#666d7d; --accent:#087f68;
+}
+* { box-sizing:border-box; margin:0; padding:0; }
+body {
+  background:var(--bg); color:var(--text);
+  font-family:Arial,sans-serif; min-height:100vh;
+  transition:.2s;
+}
+.layout { display:flex; min-height:100vh; }
+aside {
+  width:245px; background:var(--panel); padding:22px;
+  border-right:1px solid #7772;
+}
+.logo { font-size:25px; font-weight:bold; color:var(--accent); }
+.new, .history-item {
+  padding:12px; border-radius:10px; margin-top:18px;
+  cursor:pointer; background:var(--card);
+}
+.history-item {
+  margin-top:8px; font-size:13px; overflow-wrap:anywhere;
+}
+.history-item:hover, .new:hover { opacity:.8; }
+main { flex:1; padding:24px; min-width:0; }
+.top {
+  display:flex; justify-content:space-between;
+  align-items:center; gap:12px;
+}
+button {
+  cursor:pointer; border:0; border-radius:10px;
+  padding:11px 15px; background:var(--card);
+  color:var(--text); font-size:14px;
+}
+button:hover { filter:brightness(1.15); }
+.hero {
+  max-width:800px; margin:65px auto 30px; text-align:center;
+}
+.hero h1 { font-size:clamp(28px,5vw,43px); margin-bottom:13px; }
+.hero h1 span {
+  background:linear-gradient(90deg,#66e0bd,#9a8cff);
+  color:transparent; background-clip:text;
+}
+.hero p { color:var(--muted); }
+.search-wrap { position:relative; margin-top:28px; }
+.search {
+  display:flex; align-items:center; gap:8px;
+  padding:8px; border:1px solid #7775;
+  border-radius:17px; background:var(--panel);
+}
+.search input {
+  flex:1; min-width:0; padding:13px 8px;
+  border:0; outline:0; color:var(--text);
+  background:transparent; font-size:16px;
+}
+.primary { background:var(--accent); color:#10231f; font-weight:bold; }
+#suggestions {
+  display:none; position:absolute; z-index:5; top:100%;
+  left:0; right:0; margin-top:5px; text-align:left;
+  background:var(--panel); border:1px solid #7775;
+  border-radius:12px; overflow:hidden;
+}
+.suggestion { padding:12px; cursor:pointer; }
+.suggestion:hover { background:var(--card); }
+.section { max-width:900px; margin:28px auto; }
+.section h3 { font-size:16px; margin-bottom:15px; }
+.chips { display:flex; flex-wrap:wrap; gap:9px; }
+.chip { border:1px solid #7775; border-radius:22px; }
+.chip.active { border-color:var(--accent); color:var(--accent); }
+.grid {
+  display:grid; grid-template-columns:repeat(auto-fit,minmax(210px,1fr));
+  gap:13px;
+}
+.card {
+  background:var(--panel); border:1px solid #7772;
+  border-radius:15px; padding:19px;
+}
+.card h3 { margin-bottom:9px; }
+.card p { color:var(--muted); font-size:13px; line-height:1.6; }
+.card button { margin-top:15px; width:100%; }
+#results { display:none; }
+footer { text-align:center; color:var(--muted); font-size:12px; margin:35px 0; }
+@media(max-width:650px) {
+  aside { width:68px; padding:12px 7px; }
+  .logo { font-size:14px; }
+  .side-label { display:none; }
+  .new { text-align:center; padding:10px 3px; font-size:12px; }
+  main { padding:15px 10px; }
+  .hero { margin-top:55px; }
+  .search { gap:3px; }
+  .search input { font-size:14px; }
+  .search button { padding:10px; }
+}
+</style>
+</head>
+
+<body>
+<div class="layout">
+
+<aside>
+  <div class="logo">✦ MyGPT</div>
+  <div class="new" onclick="resetSearch()">＋ <span class="side-label">New Search</span></div>
+  <p class="side-label" style="margin-top:30px;color:var(--muted)">RECENT SEARCHES</p>
+  <div id="history"></div>
+</aside>
+
+<main>
+  <div class="top">
+    <strong>Smart Search</strong>
+    <div>
+      <button onclick="toggleTheme()" id="themeBtn">☀️ Light</button>
+      <button onclick="clearHistory()">🗑</button>
+    </div>
+  </div>
+
+  <section class="hero" id="hero">
+    <h1>Explore the web with <span>MyGPT</span></h1>
+    <p>One question. Multiple platforms. Endless possibilities.</p>
+
+    <div class="search-wrap">
+      <div class="search">
+        <span>⌕</span>
+        <input id="query" placeholder="Ask anything or search the web..."
+          autocomplete="off" oninput="showSuggestions()"
+          onkeydown="if(event.key==='Enter') searchAll()">
+        <button onclick="copyPrompt()">Copy</button>
+        <button class="primary" onclick="searchAll()">Search ↗</button>
+      </div>
+      <div id="suggestions"></div>
+    </div>
+  </section>
+
+  <section class="section">
+    <h3>Choose your platforms</h3>
+    <div class="chips" id="platforms">
+      <button class="chip active" data-site="Google" onclick="selectSite(this)">🔎 Google</button>
+      <button class="chip" data-site="YouTube" onclick="selectSite(this)">▶ YouTube</button>
+      <button class="chip" data-site="ChatGPT" onclick="selectSite(this)">✳ ChatGPT</button>
+      <button class="chip" data-site="Gemini" onclick="selectSite(this)">✦ Gemini</button>
+      <button class="chip" data-site="Claude" onclick="selectSite(this)">◈ Claude</button>
+      <button class="chip" data-site="Bing" onclick="selectSite(this)">🌐 Bing</button>
+    </div>
+  </section>
+
+  <section class="section" id="quick">
+    <h3>✨ Try a quick prompt</h3>
+    <div class="grid">
+      <div class="card">
+        <h3>💻 Coding</h3>
+        <p>Learn programming and build projects.</p>
+        <button onclick="usePrompt('How do I learn JavaScript?')">Explore coding →</button>
+      </div>
+      <div class="card">
+        <h3>📚 Learning</h3>
+        <p>Understand difficult topics simply.</p>
+        <button onclick="usePrompt('Explain artificial intelligence simply')">Start learning →</button>
+      </div>
+      <div class="card">
+        <h3>💡 Ideas</h3>
+        <p>Discover creative ideas and solutions.</p>
+        <button onclick="usePrompt('Give me creative website project ideas')">Get ideas →</button>
+      </div>
+      <div class="card">
+        <h3>🎥 Videos</h3>
+        <p>Find tutorials and educational videos.</p>
+        <button onclick="usePrompt('Web development tutorials for beginners')">Find videos →</button>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" id="results">
+    <h3>🔍 Search destinations</h3>
+    <p style="color:var(--muted);margin-bottom:15px;font-size:13px">
+      Choose a platform to view its live results.
+    </p>
+    <div class="grid" id="resultGrid"></div>
+  </section>
+
+  <footer>MyGPT • Your personal search dashboard</footer>
+</main>
+</div>
+
+<script>
+const input = document.getElementById("query");
+const suggestionBox = document.getElementById("suggestions");
+
+const urls = {
+  Google: q => "https://www.google.com/search?q=" + q,
+  YouTube: q => "https://www.youtube.com/results?search_query=" + q,
+  ChatGPT: q => "https://chatgpt.com/?q=" + q,
+  Gemini: q => "https://gemini.google.com/app",
+  Claude: q => "https://claude.ai/new",
+  Bing: q => "https://www.bing.com/search?q=" + q
+};
+
+let selected = ["Google"];
+let history = JSON.parse(localStorage.getItem("mygpt-history") || "[]");
+
+function selectSite(btn) {
+  const site = btn.dataset.site;
+  if (selected.includes(site)) {
+    selected = selected.filter(s => s !== site);
+    btn.classList.remove("active");
+  } else {
+    selected.push(site);
+    btn.classList.add("active");
+  }
+}
+
+function showSuggestions() {
+  const q = input.value.trim();
+  if (!q) {
+    suggestionBox.style.display = "none";
+    return;
+  }
+
+  const suggestions = [
+    q, "How does " + q + " work?",
+    q + " for beginners", q + " examples"
+  ];
+
+  suggestionBox.innerHTML = "";
+  suggestions.forEach(text => {
+    const item = document.createElement("div");
+    item.className = "suggestion";
+    item.textContent = "⌕  " + text;
+    item.onclick = () => {
+      input.value = text;
+      suggestionBox.style.display = "none";
+      searchAll();
+    };
+    suggestionBox.appendChild(item);
+  });
+  suggestionBox.style.display = "block";
+}
+
+function usePrompt(text) {
+  input.value = text;
+  input.focus();
+  searchAll();
+}
+
+function searchAll() {
+  const text = input.value.trim();
+  if (!text) {
+    input.focus();
+    return;
+  }
+  suggestionBox.style.display = "none";
+
+  history = [text, ...history.filter(x => x !== text)].slice(0, 8);
+  localStorage.setItem("mygpt-history", JSON.stringify(history));
+  renderHistory();
+
+  const q = encodeURIComponent(text);
+  const grid = document.getElementById("resultGrid");
+  grid.innerHTML = "";
+
+  const sites = selected.length ? selected : ["Google"];
+
+  sites.forEach(site => {
+    const card = document.createElement("div");
+    card.className = "card";
+
+    const heading = document.createElement("h3");
+    heading.textContent = site;
+
+    const description = document.createElement("p");
+    description.textContent = "Search for: " + text;
+
+    const link = document.createElement("a");
+    link.href = urls[site](q);
+    link.target = "_blank";
+    link.rel = "noopener noreferrer";
+    link.style.textDecoration = "none";
+
+    const button = document.createElement("button");
+    button.className = "primary";
+    button.textContent = "View results ↗";
+    link.appendChild(button);
+
+    card.append(heading, description, link);
+    grid.appendChild(card);
+  });
+
+  document.getElementById("results").style.display = "block";
+  document.getElementById("quick").style.display = "none";
+  document.getElementById("hero").style.marginTop = "25px";
+  document.getElementById("results").scrollIntoView({behavior:"smooth"});
+}
+
+function renderHistory() {
+  const box = document.getElementById("history");
+  box.innerHTML = "";
+
+  history.forEach(text => {
+    const item = document.createElement("div");
+    item.className = "history-item";
+    item.textContent = "⌕ " + text;
+    item.title = text;
+    item.onclick = () => {
+      input.value = text;
+      searchAll();
+    };
+    box.appendChild(item);
+  });
+}
+
+function resetSearch() {
+  input.value = "";
+  document.getElementById("results").style.display = "none";
+  document.getElementById("quick").style.display = "block";
+  document.getElementById("hero").style.marginTop = "65px";
+  suggestionBox.style.display = "none";
+  input.focus();
+}
+
+function clearHistory() {
+  history = [];
+  localStorage.removeItem("mygpt-history");
+  renderHistory();
+}
+
+async function copyPrompt() {
+  if (!input.value.trim()) return;
+  try {
+    await navigator.clipboard.writeText(input.value);
+    alert("Prompt copied!");
+  } catch {
+    input.select();
+    alert("Press Ctrl+C to copy your prompt.");
+  }
+}
+
+function toggleTheme() {
+  document.body.classList.toggle("light");
+  const light = document.body.classList.contains("light");
+  document.getElementById("themeBtn").textContent =
+    light ? "🌙 Dark" : "☀️ Light";
+  localStorage.setItem("mygpt-theme", light ? "light" : "dark");
+}
+
+if (localStorage.getItem("mygpt-theme") === "light") {
+  document.body.classList.add("light");
+  document.getElementById("themeBtn").textContent = "🌙 Dark";
+}
+
+renderHistory();
+</script>
+
+<div class="google-results">
+  <h2>Search the Web with MyGPT</h2>
+
+  <script async
+    src="https://cse.google.com/cse.js?cx=YOUR_ENGINE_ID">
+  </script>
+
+  <div class="gcse-search"></div>
+</div>
+
+<style>
+.google-results {
+  max-width: 850px;
+  margin: 30px auto;
+  padding: 20px;
+  border-radius: 16px;
+  background: #191b23;
+  color: white;
+}
+.google-results h2 {
+  margin-bottom: 18px;
+  font-family: Arial, sans-serif;
+}
+</style>
+
+</body>
+</html>
